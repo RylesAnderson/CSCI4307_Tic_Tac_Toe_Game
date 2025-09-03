@@ -2,20 +2,20 @@ import tkinter
 
 def game_board(row, column):
     global currentPlayer
-    if game_over:
-        return
-    if board[row][column]["text"] != "":
+    if game_over or board[row][column]["text"] != "":
         return
 
     board[row][column]["text"] = currentPlayer
-
-    if currentPlayer == playerO:
-        currentPlayer = playerX
-    else:
-        currentPlayer = playerO
-
-    label["text"] = currentPlayer + "'s turn"
     results()
+
+    if not game_over:
+        currentPlayer = playerO
+        label["text"] = currentPlayer + "'s turn"
+        row_bob, col_bob = best_move()
+        board[row_bob][col_bob]["text"] = currentPlayer
+        results()
+        currentPlayer = playerX
+        label["text"] = currentPlayer + "'s turn"
 
 def update_score(winner):
     global scoreX, scoreO
@@ -81,6 +81,62 @@ def results():
     if turns == 9:
         game_over = True
         label.config(text="Tie!", foreground=yellow)
+
+def best_move():
+    best_score = -float('inf')
+    move = None
+    for row in range(3):
+        for col in range(3):
+            if board[row][col]["text"] == "":
+                board[row][col]["text"] = playerO
+                score = minimax(False)
+                board[row][col]["text"] = ""
+                if score > best_score:
+                    best_score = score
+                    move = (row, col)
+    return move
+
+def get_empty_cells():
+    return [(row, col) for row in range(3) for col in range(3) if board[row][col]["text"] == ""]
+
+def minimax(is_maximizing):
+    result = check_winner()
+    if result == playerO:
+        return 1
+    elif result == playerX:
+        return -1
+    elif is_full():
+        return 0
+
+    best_score = -float('inf') if is_maximizing else float('inf')
+
+    for row, col in get_empty_cells():
+        board[row][col]["text"] = playerO if is_maximizing else playerX
+        score = minimax(not is_maximizing)
+        board[row][col]["text"] = ""
+
+        if is_maximizing:
+            best_score = max(score, best_score)
+        else:
+            best_score = min(score, best_score)
+
+    return best_score
+
+def is_full():
+    return all(board[row][col]["text"] != "" for row in range(3) for col in range(3))
+
+def check_winner():
+    for row in range(3):
+        if board[row][0]["text"] == board[row][1]["text"] == board[row][2]["text"] != "":
+            return board[row][0]["text"]
+    for col in range(3):
+        if board[0][col]["text"] == board[1][col]["text"] == board[2][col]["text"] != "":
+            return board[0][col]["text"]
+    if board[0][0]["text"] == board[1][1]["text"] == board[2][2]["text"] != "":
+        return board[0][0]["text"]
+    if board[0][2]["text"] == board[1][1]["text"] == board[2][0]["text"] != "":
+        return board[0][2]["text"]
+    return None
 
 playerX = "X"
 playerO = "O"
