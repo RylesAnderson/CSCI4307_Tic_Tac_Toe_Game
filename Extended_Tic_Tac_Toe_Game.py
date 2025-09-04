@@ -1,7 +1,6 @@
 import sys
 import pygame
 import numpy as np
-from Tools.demo.sortvisu import WIDTH
 
 pygame.init()
 
@@ -11,15 +10,15 @@ RED = (250, 0, 0)
 GREEN = (0, 250, 0)
 BLACK = (0, 0, 0)
 
-WIDTH = 300
-HEIGHT = 300
+WIDTH = 500
+HEIGHT = 500
 LINE_WIDTH = 5
-BOARD_ROWS = 3
-BOARD_COLS = 3
+BOARD_ROWS = 5
+BOARD_COLS = 5
 SQUARE_SIZE = WIDTH // BOARD_COLS
 CIRCLE_RADIUS = SQUARE_SIZE // 3
-CIRCLE_WIDTH = 15
-CROSS_WIDTH = 25
+CIRCLE_WIDTH = 10
+CROSS_WIDTH = 15
 score_player = 0
 score_ai = 0
 
@@ -70,76 +69,97 @@ def is_board_full(check_board=board):
     return True
 
 def check_win(player, check_board=board):
+    if any(all(check_board[row][col + i] == player for i in range(5))
+           for row in range(BOARD_ROWS)
+           for col in range(BOARD_COLS - 4)):
+        return True
+
+    if any(all(check_board[row + i][col] == player for i in range(5))
+           for col in range(BOARD_COLS)
+           for row in range(BOARD_ROWS - 4)):
+        return True
+
+    if any(all(check_board[row + i][col + i] == player for i in range(5))
+           for row in range(BOARD_ROWS - 4)
+           for col in range(BOARD_COLS - 4)):
+        return True
+
+    if any(all(check_board[row - i][col + i] == player for i in range(5))
+           for row in range(4, BOARD_ROWS)
+           for col in range(BOARD_COLS - 4)):
+        return True
+
+    return False
+
+def evaluate_board(check_board, player):
+    score = 0
+    opponent = 1 if player == 2 else 2
+
     for row in range(BOARD_ROWS):
-        for col in range(BOARD_COLS - 4): # Stop 4 columns from the end to allow for a 5-in-a-row check
-            if all(check_board[row][col+i] == player for i in range(5)):
-                return True
-
-    for col in range(BOARD_COLS):
-        for row in range(BOARD_ROWS - 4):
-            if all(check_board[row+i][col] == player for i in range(5)):
-                return True
-
-    for row in range(BOARD_ROWS - 4):
         for col in range(BOARD_COLS - 4):
-            if all(check_board[row+i][col+i] == player for i in range(5)):
-                return True
+            line = check_board[row, col:col+5]
+            if np.count_nonzero(line == player) == 4 and np.count_nonzero(line == 0) == 1:
+                score += 1000
 
-    for row in range(4, BOARD_ROWS):
+    for row in range(BOARD_ROWS):
         for col in range(BOARD_COLS - 4):
-            if all(check_board[row-i][col+i] == player for i in range(5)):
-                return True
-        return False
+            line = check_board[row, col:col+5]
+            if np.count_nonzero(line == opponent) == 4 and np.count_nonzero(line == 0) == 1:
+                score += 500
 
-def minimax(minimax_board, depth, is_maximizing):
-    if check_win(2, minimax_board):
-        return float('inf')
-    elif check_win(1, minimax_board):
-        return float('-inf')
-    elif is_board_full(minimax_board):
-        return 0
+    for row in range(BOARD_ROWS):
+        for col in range(BOARD_COLS - 3):
+            line = check_board[row, col:col+4]
+            if np.count_nonzero(line == player) == 3 and np.count_nonzero(line == 0) == 1:
+                score += 100
 
-    if is_maximizing:
-        best_score = -1000
-        for row in range(BOARD_ROWS):
-            for col in range(BOARD_COLS):
-                if minimax_board[row][col] == 0:
-                    minimax_board[row][col] = 2
-                    score = minimax(minimax_board, depth + 1, False)
-                    minimax_board[row][col] = 0
-                    best_score = max(score, best_score)
-        return best_score
-    else:
-        best_score = 1000
-        for row in range(BOARD_ROWS):
-            for col in range(BOARD_COLS):
-                if minimax_board[row][col] == 0:
-                    minimax_board[row][col] = 1
-                    score = minimax(minimax_board, depth + 1, True)
-                    minimax_board[row][col] = 0
-                    best_score = min(score, best_score)
-        return best_score
+    return score
 
 def best_move():
     best_score = -1000
     move = (-1, -1)
+
     for row in range(BOARD_ROWS):
         for col in range(BOARD_COLS):
             if board[row][col] == 0:
                 board[row][col] = 2
-                score = minimax(board, 0, False)
+                if check_win(2):
+                    board[row][col] = 0
+                    return (row, col)
                 board[row][col] = 0
-                if score > best_score:
-                    best_score = score
+
+    for row in range(BOARD_ROWS):
+        for col in range(BOARD_COLS):
+            if board[row][col] == 0:
+                board[row][col] = 1
+                if check_win(1):
+                    board[row][col] = 0
+                    return (row, col)
+                board[row][col] = 0
+
+    for row in range(BOARD_ROWS):
+        for col in range(BOARD_COLS):
+            if board[row][col] == 0:
+                board[row][col] = 2
+                current_score = evaluate_board(board, 2)
+                board[row][col] = 0
+                if current_score > best_score:
+                    best_score = current_score
                     move = (row, col)
 
-    if move != (-1, -1):
-        mark_square(move[0], move[1], 2)
-        return True
-    return False
+    if move == (-1, -1):
+        if board[2][2] == 0:
+            return (2, 2)
+        else:
+            for row in range(BOARD_ROWS):
+                for col in range(BOARD_COLS):
+                    if board[row][col] == 0:
+                        return (row, col)
+
+    return move
+
 
 def restart_game():
-    global start_ticks
     screen.fill(BLACK)
     draw_lines()
     for row in range(BOARD_ROWS):
@@ -154,11 +174,29 @@ def draw_score():
 def draw_timer():
     font = pygame.font.SysFont(None, 30)
     elapsed_seconds = (pygame.time.get_ticks() - start_ticks) // 1000
-    remaining = max(0, 30 - elapsed_seconds)  # don’t go negative
+    remaining = max(0, 60 - elapsed_seconds)
     text = font.render(f"Time: {remaining}s", True, WHITE)
     screen.blit(text, (WIDTH - 120, 10))
     return remaining
 
+def display_winner():
+    font = pygame.font.SysFont(None, 75)
+    winner_text = ""
+    text_color = GRAY
+
+    if score_player > score_ai:
+        winner_text = "You Win!"
+        text_color = GREEN
+    elif score_ai > score_player:
+        winner_text = "Bob Wins!"
+        text_color = RED
+    else:
+        winner_text = "Draw!"
+        text_color = GRAY
+
+    text = font.render(winner_text, True, text_color)
+    text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+    screen.blit(text, text_rect)
 
 draw_lines()
 
@@ -184,7 +222,9 @@ while True:
                 player = player % 2 + 1
 
                 if not game_over:
-                    if best_move():
+                    ai_move = best_move()
+                    if ai_move:
+                        mark_square(ai_move[0], ai_move[1], 2)
                         if check_win(2):
                             score_ai += 1
                             game_over = True
@@ -200,19 +240,17 @@ while True:
                 game_over = False
                 player = 1
 
+    remaining_time = draw_timer()
+    if remaining_time <= 0 and not game_over:
+        game_over = True
+
     if not game_over:
         draw_figures()
     else:
-        if check_win(1):
-            draw_figures(GREEN)
-            draw_lines(GREEN)
-        elif check_win(2):
-            draw_figures(RED)
-            draw_lines(RED)
-        else:
-            draw_figures(GRAY)
-            draw_lines(GRAY)
+        screen.fill(BLACK)
+        draw_figures()
+        draw_lines(GRAY)
+        display_winner()
 
     draw_score()
-    draw_timer()
     pygame.display.update()
